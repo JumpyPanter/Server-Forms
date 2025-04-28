@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "serverforms",
+  "version": "${version}",
+  "name": "ServerForms",
+  "description": "A Minecraft mod for creating and managing forms and questionnaires.",
+  "authors": [
+    "JumpyPanter"
+  ],
+  "contact": {},
+  "license": "All-Rights-Reserved",
+  "environment": "server",
+  "entrypoints": {
+    "fabric-datagen": [
+      "nl.jumpypanter.client.formmodDataGenerator"
+    ],
+    "main": [
+      "nl.jumpypanter.ServerForms"
+    ]
+  },
+  "mixins": [
+    "formmod.mixins.json",
+    {
+      "config": "formmod.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version}"
+  }
+}

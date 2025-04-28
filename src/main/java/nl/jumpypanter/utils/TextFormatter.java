@@ -20,20 +20,26 @@ public class TextFormatter {
      * @return A Text object with the appropriate color formatting.
      */
     public static Text formatColor(String input) {
-        String formatted = input;
+        StringBuilder formatted = new StringBuilder();
         Matcher matcher = COLOR_CODE_PATTERN.matcher(input);
+        int lastEnd = 0;
 
         // Replace color codes with Minecraft's Formatting enums
         while (matcher.find()) {
+            formatted.append(input, lastEnd, matcher.start()); // Append text before the color code
             String code = matcher.group(1);
             Formatting formatting = getFormattingFromCode(code);
             if (formatting != null) {
-                formatted = formatted.replace("&" + code, formatting.toString());
+                formatted.append(formatting); // Append the formatting
             }
+            lastEnd = matcher.end();
         }
 
+        // Append the remaining text
+        formatted.append(input.substring(lastEnd));
+
         // Return the formatted text as a Text object
-        return Text.literal(formatted);
+        return Text.literal(formatted.toString());
     }
 
     /**

@@ -106,6 +106,19 @@ public class ConfigLoader {
 
         defaultConfig.add("forms", forms);
 
+        // Add default messages
+        JsonObject messages = new JsonObject();
+        messages.addProperty("formSuccess", "Thank you for completing the form!");
+        messages.addProperty("formError", "An error occurred. Please try again.");
+        messages.addProperty("playerNotFound", "&cPlayer '{player}' does not exist or has never joined the server.");
+        messages.addProperty("formNotFound", "&cForm '{form}' not found for player: {player}.");
+        messages.addProperty("viewingForm", "&aViewing form: {form} for player: {player}.");
+        messages.addProperty("answerRecorded", "&aYour answer has been recorded.");
+        messages.addProperty("noFormsFound", "&cNo forms found for player: {player}.");
+        messages.addProperty("readError", "&cAn error occurred while reading the form file.");
+
+        defaultConfig.add("messages", messages);
+
         try (FileWriter writer = new FileWriter(CONFIG_FILE)) {
             GSON.toJson(defaultConfig, writer);
             ServerForms.LOGGER.info("Default forms configuration generated at: " + CONFIG_FILE.getAbsolutePath());
@@ -139,15 +152,17 @@ public class ConfigLoader {
     }
 
     /**
-     * Retrieves the settings section of the configuration.
+     * Retrieves a specific message from the configuration.
      *
-     * @return A JsonObject containing all settings, or an empty JsonObject if missing.
+     * @param key          The key of the message.
+     * @param defaultValue The default value to return if the key is not found.
+     * @return The message as a String.
      */
-    public static JsonObject getSettings() {
-        if (config == null || !config.has("settings") || config.get("settings").isJsonNull()) {
-            ServerForms.LOGGER.error("The 'settings' section is missing in the configuration.");
-            return new JsonObject();
+    public static String getMessage(String key, String defaultValue) {
+        if (config != null && config.has("messages")) {
+            JsonObject messages = config.getAsJsonObject("messages");
+            return messages.has(key) ? messages.get(key).getAsString() : defaultValue;
         }
-        return config.getAsJsonObject("settings");
+        return defaultValue;
     }
 }

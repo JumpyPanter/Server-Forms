@@ -3,7 +3,10 @@ package nl.jumpypanter.commands;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;

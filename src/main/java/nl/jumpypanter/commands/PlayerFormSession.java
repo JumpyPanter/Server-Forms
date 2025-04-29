@@ -16,6 +16,8 @@ public class PlayerFormSession {
     private final Map<String, String> answers = new HashMap<>();
     private int currentQuestionIndex = 0;
 
+    private static final String DEFAULT_FORM_NAME = "unknown_form";
+
     /**
      * Constructs a new PlayerFormSession.
      *
@@ -86,7 +88,9 @@ public class PlayerFormSession {
      * @return The form name, or "unknown_form" if the name is not specified.
      */
     public String getFormName() {
-        return form.has("name") && !form.get("name").isJsonNull() ? form.get("name").getAsString() : "unknown_form";
+        return form.has("name") && !form.get("name").isJsonNull() 
+            ? form.get("name").getAsString() 
+            : DEFAULT_FORM_NAME;
     }
 
     /**
@@ -95,6 +99,8 @@ public class PlayerFormSession {
      * @return A JsonArray of questions, or an empty JsonArray if none are defined.
      */
     private JsonArray getQuestions() {
-        return form.has("questions") && !form.get("questions").isJsonNull() ? form.getAsJsonArray("questions") : new JsonArray();
+        return form.has("questions") && form.get("questions").isJsonArray() 
+            ? form.getAsJsonArray("questions") 
+            : new JsonArray();
     }
 }

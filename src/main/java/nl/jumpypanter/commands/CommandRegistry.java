@@ -8,6 +8,9 @@ import net.minecraft.server.command.ServerCommandSource;
 import nl.jumpypanter.ServerForms;
 import nl.jumpypanter.config.ConfigLoader;
 import nl.jumpypanter.events.FormHandler;
+import nl.jumpypanter.events.FormValidator;
+import nl.jumpypanter.utils.TextFormatter;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
@@ -19,18 +22,16 @@ import static com.mojang.brigadier.arguments.StringArgumentType.*;
 import static net.minecraft.server.command.CommandManager.argument;
 import static net.minecraft.server.command.CommandManager.literal;
 
-import nl.jumpypanter.utils.TextFormatter;
-
 /**
  * Handles the registration of commands for the form mod.
- * Includes commands for starting forms, answering forms, and viewing form responses.
+ * Includes commands for starting forms, answering forms, viewing form responses, and reloading forms.
  */
 public class CommandRegistry {
-    private static final File FORM_ANSWERS_DIR = new File("mods", "FormAnswers"); // Reverted to match the rest of the codebase
+    private static final File FORM_ANSWERS_DIR = new File("mods", "FormAnswers");
 
     /**
      * Registers all commands for the form mod.
-     * This includes commands for starting forms, answering forms, and viewing form responses.
+     * This includes commands for starting forms, answering forms, viewing form responses, and reloading forms.
      */
     public static void register() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
@@ -43,7 +44,7 @@ public class CommandRegistry {
                 // Ensure the "command" key exists and is valid
                 if (!form.has("command") || form.get("command").isJsonNull()) {
                     ServerForms.LOGGER.error("Form '{}' is missing the 'command' field or it is null. JSON: {}", formId, form);
-                    continue; // Skip this form if the "command" field is invalid
+                    continue;
                 }
 
                 String commandName = form.get("command").getAsString();
@@ -67,7 +68,7 @@ public class CommandRegistry {
 
             // Register the /viewform command
             dispatcher.register(literal("viewform")
-                    .then(argument("playername", word()) // Suggest player names
+                    .then(argument("playername", word())
                             .suggests((context, builder) -> {
                                 File[] files = FORM_ANSWERS_DIR.listFiles();
                                 if (files != null) {
@@ -90,7 +91,7 @@ public class CommandRegistry {
                                 String playerName = getString(context, "playername");
                                 return viewForm(context.getSource(), playerName, null);
                             })
-                            .then(argument("formname", greedyString()) // Suggest form names
+                            .then(argument("formname", greedyString())
                                     .suggests((context, builder) -> {
                                         String playerName = getString(context, "playername").toLowerCase();
                                         File[] files = FORM_ANSWERS_DIR.listFiles();
@@ -119,31 +120,43 @@ public class CommandRegistry {
                                         String formName = getString(context, "formname");
                                         return viewForm(context.getSource(), playerName, formName);
                                     }))));
+
+            // Register the /reloadforms command
+            dispatcher.register(literal("reloadforms")
+                    .requires(source -> source.hasPermissionLevel(4)) // Only allow OPs
+                    .executes(context -> {
+                        ServerCommandSource source = context.getSource();
+                        return reloadForms(source);
+                    }));
+        });
+    }
+
+    /**
+     * Utility method to register a command with the dispatcher.
+     *
+     * @param commandName The name of the command.
+     * @param commandLogic A consumer that defines the command's logic.
+     */
+    public static void registerCommand(String commandName, Consumer<CommandDispatcher<ServerCommandSource>> commandLogic) {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            commandLogic.accept(dispatcher);
+            ServerForms.LOGGER.info("Registered command: /" + commandName);
         });
     }
 
     /**
      * Handles the /viewform command to view a player's form responses.
      *
-     * @param source    The command source (e.g., the player or console executing the command).
+     * @param source     The command source (e.g., the player or console executing the command).
      * @param playerName The name of the player whose form responses are being viewed.
      * @param formName   The name of the specific form to view (optional).
      * @return 1 if the command executed successfully, 0 otherwise.
      */
     private static int viewForm(ServerCommandSource source, String playerName, String formName) {
-        // Resolve the player's UUID from the player name
-        UUID playerUUID = source.getServer().getUserCache().findByName(playerName)
-                .map(profile -> profile.getId())
-                .orElse(null);
+        UUID playerUUID = resolvePlayerUUID(source, playerName);
+        if (playerUUID == null) return 0;
 
-        if (playerUUID == null) {
-            source.sendError(TextFormatter.formatColor("&cPlayer '" + playerName + "' does not exist or has never joined the server."));
-            return 0;
-        }
-
-        // Locate the file using the UUID
-        File playerFile = new File(FORM_ANSWERS_DIR, playerUUID.toString() + ".json");
-
+        File playerFile = new File(FORM_ANSWERS_DIR, playerUUID + ".json");
         if (!playerFile.exists()) {
             source.sendError(TextFormatter.formatColor("&cNo forms found for player: " + playerName));
             return 0;
@@ -151,27 +164,10 @@ public class CommandRegistry {
 
         try (FileReader reader = new FileReader(playerFile)) {
             JsonObject allForms = ConfigLoader.GSON.fromJson(reader, JsonObject.class);
+            formName = resolveFormName(source, allForms, formName, playerName);
+            if (formName == null) return 0;
 
-            if (formName == null) {
-                // Get the latest form if no formName is provided
-                formName = allForms.keySet().stream().reduce((first, second) -> second).orElse(null);
-            }
-
-            if (formName == null || !allForms.has(formName)) {
-                source.sendError(TextFormatter.formatColor("&cForm '" + formName + "' not found for player: " + playerName));
-                return 0;
-            }
-
-            JsonObject formAnswers = allForms.getAsJsonObject(formName);
-            String finalFormName = formName;
-            source.sendFeedback(() -> TextFormatter.formatColor("&aViewing form: " + finalFormName + " for player: " + playerName), false);
-
-            formAnswers.entrySet().forEach(entry -> {
-                String questionId = entry.getKey();
-                String answer = entry.getValue().getAsString();
-                source.sendFeedback(() -> TextFormatter.formatColor("&b" + questionId + ": &f" + answer), false);
-            });
-
+            displayFormAnswers(source, allForms.getAsJsonObject(formName), formName, playerName);
             return 1;
         } catch (IOException e) {
             ServerForms.LOGGER.error("Failed to read form file for player: " + playerName, e);
@@ -179,16 +175,74 @@ public class CommandRegistry {
             return 0;
         }
     }
+
     /**
-     * Registers a command with the given name and handler.
+     * Resolves the form name from the provided JSON object.
      *
-     * @param commandName The name of the command.
-     * @param command     The command handler.
+     * @param source     The command source for sending feedback.
+     * @param allForms   The JSON object containing all forms.
+     * @param formName   The name of the form to resolve (can be null).
+     * @param playerName The name of the player whose forms are being resolved.
+     * @return The resolved form name, or null if not found.
      */
-    public static void registerCommand(String commandName, Consumer<CommandDispatcher<ServerCommandSource>> command) {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            command.accept(dispatcher);
-            ServerForms.LOGGER.info("Registered command: /" + commandName);
+    private static String resolveFormName(ServerCommandSource source, JsonObject allForms, String formName, String playerName) {
+        if (formName == null) {
+            formName = allForms.keySet().stream().reduce((first, second) -> second).orElse(null);
+        }
+        if (formName == null || !allForms.has(formName)) {
+            source.sendError(TextFormatter.formatColor("&cForm '" + formName + "' not found for player: " + playerName));
+            return null;
+        }
+        return formName;
+    }
+
+    /**
+     * Displays the answers of a specific form to the command source.
+     *
+     * @param source      The command source (e.g., the player or console executing the command).
+     * @param formAnswers The JSON object containing the form answers.
+     * @param formName    The name of the form being displayed.
+     * @param playerName  The name of the player whose answers are being displayed.
+     */
+    private static void displayFormAnswers(ServerCommandSource source, JsonObject formAnswers, String formName, String playerName) {
+        source.sendFeedback(() -> TextFormatter.formatColor("&aViewing form: " + formName + " for player: " + playerName), false);
+        formAnswers.entrySet().forEach(entry -> {
+            source.sendFeedback(() -> TextFormatter.formatColor("&b" + entry.getKey() + ": &f" + entry.getValue().getAsString()), false);
         });
+    }
+
+    /**
+     * Resolves the UUID of a player by their name.
+     *
+     * @param source     The command source for sending feedback.
+     * @param playerName The name of the player.
+     * @return The UUID of the player, or null if not found.
+     */
+    private static UUID resolvePlayerUUID(ServerCommandSource source, String playerName) {
+        return source.getServer().getUserCache().findByName(playerName)
+                .map(profile -> profile.getId())
+                .orElseGet(() -> {
+                    source.sendError(TextFormatter.formatColor("&cPlayer '" + playerName + "' does not exist or has never joined the server."));
+                    return null;
+                });
+    }
+
+    /**
+     * Handles the /reloadforms command to reload the configuration.
+     *
+     * @param source The command source (e.g., the player or console executing the command).
+     * @return 1 if the configuration reloads successfully, 0 otherwise.
+     */
+    private static int reloadForms(ServerCommandSource source) {
+        try {
+            ConfigLoader.loadConfig();
+            FormValidator.validateForms(ConfigLoader.getForms());
+            source.sendFeedback(() -> TextFormatter.formatColor("&aForms configuration reloaded successfully!"), false);
+            return 1;
+        } catch (Exception e) {
+            ServerForms.LOGGER.error("Failed to reload forms configuration.", e);
+            source.sendError(TextFormatter.formatColor("&cFailed to reload forms configuration. Check the logs for details."));
+            return 0;
+        }
     }
 }

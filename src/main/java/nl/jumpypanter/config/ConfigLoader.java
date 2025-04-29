@@ -18,6 +18,9 @@ public class ConfigLoader {
     public static final File CONFIG_FILE = new File(CONFIG_DIR, "ServerForms.json");
     private static JsonObject config;
 
+    private static final String FORMS_KEY = "forms";
+    private static final String MESSAGES_KEY = "messages";
+
     /**
      * Loads the configuration file. If the file does not exist or is invalid,
      * a default configuration is generated.
@@ -30,15 +33,20 @@ public class ConfigLoader {
 
         try (FileReader reader = new FileReader(CONFIG_FILE)) {
             config = GSON.fromJson(reader, JsonObject.class);
-
-            if (config == null || !config.has("forms") || !config.get("forms").isJsonObject()) {
-                ServerForms.LOGGER.error("Config file is missing the 'forms' section. Regenerating default config...");
-                generateDefaultConfig();
-            } else {
-                ServerForms.LOGGER.info("Config loaded successfully.");
-            }
+            validateConfig();
+            ServerForms.LOGGER.info("Config loaded successfully.");
         } catch (IOException e) {
             ServerForms.LOGGER.error("Failed to load config file: ", e);
+            generateDefaultConfig();
+        }
+    }
+
+    /**
+     * Validates the loaded configuration and regenerates it if invalid.
+     */
+    private static void validateConfig() {
+        if (config == null || !config.has(FORMS_KEY) || !config.get(FORMS_KEY).isJsonObject()) {
+            ServerForms.LOGGER.error("Config file is missing the '{}' section. Regenerating default config...", FORMS_KEY);
             generateDefaultConfig();
         }
     }
@@ -48,67 +56,82 @@ public class ConfigLoader {
      * This method is called if the configuration file is missing or invalid.
      */
     private static void generateDefaultConfig() {
-        if (!CONFIG_DIR.exists()) {
-            CONFIG_DIR.mkdirs();
+        if (!CONFIG_DIR.exists() && !CONFIG_DIR.mkdirs()) {
+            ServerForms.LOGGER.error("Failed to create configuration directory: {}", CONFIG_DIR.getAbsolutePath());
+            return;
         }
 
         JsonObject defaultConfig = new JsonObject();
-
         JsonObject forms = new JsonObject();
 
-        // Define a single-response form
-        JsonObject singleResponseForm = new JsonObject();
-        singleResponseForm.addProperty("name", "single_response_form");
-        singleResponseForm.addProperty("allowMultipleResponses", false);
-        singleResponseForm.addProperty("returnAnswers", true);
-        singleResponseForm.addProperty("command", "single_response");
+        // Add predefined forms
+        forms.add("single_response_form", createForm(
+                "single_response_form", false, true, "single_response",
+                new String[][]{
+                        {"1", "What is your name?"},
+                        {"2", "How old are you?"}
+                }
+        ));
 
-        JsonArray singleResponseQuestions = new JsonArray();
+        forms.add("multiple_responses_form", createForm(
+                "multiple_responses_form", true, true, "multiple_responses",
+                new String[][]{
+                        {"1", "What is your favorite color?"},
+                        {"2", "What is your favorite food?"},
+                        {"3", "What is your favorite hobby?"}
+                }
+        ));
 
-        JsonObject question1 = new JsonObject();
-        question1.addProperty("id", "1");
-        question1.addProperty("question", "What is your name?");
-        singleResponseQuestions.add(question1);
-
-        JsonObject question2 = new JsonObject();
-        question2.addProperty("id", "2");
-        question2.addProperty("question", "How old are you?");
-        singleResponseQuestions.add(question2);
-
-        singleResponseForm.add("questions", singleResponseQuestions);
-
-        // Define a multiple-responses form
-        JsonObject multipleResponsesForm = new JsonObject();
-        multipleResponsesForm.addProperty("name", "multiple_responses_form");
-        multipleResponsesForm.addProperty("allowMultipleResponses", true);
-        multipleResponsesForm.addProperty("returnAnswers", true);
-        multipleResponsesForm.addProperty("command", "multiple_responses");
-
-        JsonArray multipleResponseQuestions = new JsonArray();
-
-        JsonObject question3 = new JsonObject();
-        question3.addProperty("id", "1");
-        question3.addProperty("question", "What is your favorite color?");
-        multipleResponseQuestions.add(question3);
-
-        JsonObject question4 = new JsonObject();
-        question4.addProperty("id", "2");
-        question4.addProperty("question", "What is your favorite food?");
-        multipleResponseQuestions.add(question4);
-
-        JsonObject question5 = new JsonObject();
-        question5.addProperty("id", "3");
-        question5.addProperty("question", "What is your favorite hobby?");
-        multipleResponseQuestions.add(question5);
-
-        multipleResponsesForm.add("questions", multipleResponseQuestions);
-
-        forms.add("single_response_form", singleResponseForm);
-        forms.add("multiple_responses_form", multipleResponsesForm);
-
-        defaultConfig.add("forms", forms);
+        defaultConfig.add(FORMS_KEY, forms);
 
         // Add default messages
+        defaultConfig.add(MESSAGES_KEY, createDefaultMessages());
+
+        try (FileWriter writer = new FileWriter(CONFIG_FILE)) {
+            GSON.toJson(defaultConfig, writer);
+            ServerForms.LOGGER.info("Default forms configuration generated at: {}", CONFIG_FILE.getAbsolutePath());
+        } catch (IOException e) {
+            ServerForms.LOGGER.error("Failed to generate default forms configuration: ", e);
+        }
+
+        config = defaultConfig;
+    }
+
+    /**
+     * Creates a form with the specified properties and questions.
+     *
+     * @param name                  The name of the form.
+     * @param allowMultipleResponses Whether the form allows multiple responses.
+     * @param returnAnswers         Whether the form returns answers.
+     * @param command               The command to trigger the form.
+     * @param questions             An array of questions, where each question is a pair of [id, question text].
+     * @return A JsonObject representing the form.
+     */
+    private static JsonObject createForm(String name, boolean allowMultipleResponses, boolean returnAnswers, String command, String[][] questions) {
+        JsonObject form = new JsonObject();
+        form.addProperty("name", name);
+        form.addProperty("allowMultipleResponses", allowMultipleResponses);
+        form.addProperty("returnAnswers", returnAnswers);
+        form.addProperty("command", command);
+
+        JsonArray questionArray = new JsonArray();
+        for (String[] question : questions) {
+            JsonObject questionObject = new JsonObject();
+            questionObject.addProperty("id", question[0]);
+            questionObject.addProperty("question", question[1]);
+            questionArray.add(questionObject);
+        }
+        form.add("questions", questionArray);
+
+        return form;
+    }
+
+    /**
+     * Creates the default messages for the configuration.
+     *
+     * @return A JsonObject containing default messages.
+     */
+    private static JsonObject createDefaultMessages() {
         JsonObject messages = new JsonObject();
         messages.addProperty("formSuccess", "Thank you for completing the form!");
         messages.addProperty("formError", "An error occurred. Please try again.");
@@ -125,17 +148,7 @@ public class ConfigLoader {
         messages.addProperty("questionExists", "&cA question with ID '{id}' already exists.");
         messages.addProperty("questionNotFound", "&cNo question with ID '{id}' found in form '{form}'.");
         messages.addProperty("saveError", "&cAn error occurred while saving the configuration.");
-
-        defaultConfig.add("messages", messages);
-
-        try (FileWriter writer = new FileWriter(CONFIG_FILE)) {
-            GSON.toJson(defaultConfig, writer);
-            ServerForms.LOGGER.info("Default forms configuration generated at: " + CONFIG_FILE.getAbsolutePath());
-        } catch (IOException e) {
-            ServerForms.LOGGER.error("Failed to generate default forms configuration: ", e);
-        }
-
-        config = defaultConfig;
+        return messages;
     }
 
     /**
@@ -153,28 +166,22 @@ public class ConfigLoader {
      * @return A JsonObject containing all forms, or an empty JsonObject if missing.
      */
     public static JsonObject getForms() {
-        if (config == null || !config.has("forms") || config.get("forms").isJsonNull()) {
-            ServerForms.LOGGER.error("The 'forms' section is missing in the configuration.");
-            return new JsonObject();
-        }
-        return config.getAsJsonObject("forms");
+        return config != null && config.has(FORMS_KEY) && config.get(FORMS_KEY).isJsonObject()
+                ? config.getAsJsonObject(FORMS_KEY)
+                : new JsonObject();
     }
 
     /**
-     * Retrieves the settings section of the configuration.
+     * Retrieves a message from the configuration by its key.
      *
-     * @return A JsonObject containing all settings, or an empty JsonObject if missing.
+     * @param key            The key of the message to retrieve.
+     * @param defaultMessage The default message to return if the key is not found.
+     * @return The message corresponding to the key, or the default message if not found.
      */
-    public static JsonObject getSettings() {
-        if (config == null || !config.has("settings") || config.get("settings").isJsonNull()) {
-            ServerForms.LOGGER.error("The 'settings' section is missing in the configuration.");
-            return new JsonObject();
-        }
-        return config.getAsJsonObject("settings");
-    }
-
     public static String getMessage(String key, String defaultMessage) {
-        JsonObject messages = config.getAsJsonObject("messages");
+        JsonObject messages = config != null && config.has(MESSAGES_KEY) && config.get(MESSAGES_KEY).isJsonObject()
+                ? config.getAsJsonObject(MESSAGES_KEY)
+                : new JsonObject();
         return messages.has(key) ? messages.get(key).getAsString() : defaultMessage;
     }
 }

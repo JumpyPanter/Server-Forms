@@ -13,53 +13,46 @@ import org.slf4j.LoggerFactory;
  * loading configuration, validating forms, registering commands, and setting up event listeners.
  */
 public class ServerForms implements net.fabricmc.api.ModInitializer {
+
+    /**
+     * Logger instance for logging messages related to the FormMod.
+     */
     public static final Logger LOGGER = LoggerFactory.getLogger("FormMod");
 
     /**
-     * Called when the mod is initialized. Performs setup tasks such as loading configuration,
+     * Initializes the mod by performing setup tasks such as loading configuration,
      * validating forms, registering commands, and setting up event listeners.
      */
     @Override
     public void onInitialize() {
         LOGGER.info("FormMod is initializing...");
 
-        // Load configuration
-        try {
-            ConfigLoader.loadConfig();
-            LOGGER.info("Configuration loaded successfully.");
-        } catch (Exception e) {
-            LOGGER.error("Failed to load configuration.", e);
-            return; // Stop initialization if configuration fails
-        }
-
-        // Validate forms
-        try {
-            FormValidator.validateForms(ConfigLoader.getForms());
-            LOGGER.info("Forms validated successfully.");
-        } catch (IllegalArgumentException e) {
-            LOGGER.error("Form validation failed: {}", e.getMessage());
-            return; // Stop initialization if form validation fails
-        }
-
-        // Register commands
-        try {
+        if (!initializeComponent("Configuration", ConfigLoader::loadConfig)) return;
+        if (!initializeComponent("Forms Validation", () -> FormValidator.validateForms(ConfigLoader.getForms()))) return;
+        if (!initializeComponent("Commands", () -> {
             CommandRegistry.register();
             FormCommandHandler.registerCommands();
-            LOGGER.info("Commands registered successfully.");
-        } catch (Exception e) {
-            LOGGER.error("Failed to register commands.", e);
-            return; // Stop initialization if command registration fails
-        }
-
-        // Register events
-        try {
-            ShutdownListener.register();
-            LOGGER.info("Event listeners registered successfully.");
-        } catch (Exception e) {
-            LOGGER.error("Failed to register event listeners.", e);
-            return; // Stop initialization if event listener registration fails
-        }
+        })) return;
+        if (!initializeComponent("Event Listeners", ShutdownListener::register)) return;
 
         LOGGER.info("Server Forms has initialized successfully.");
+    }
+
+    /**
+     * Utility method to initialize a component with error handling.
+     *
+     * @param componentName The name of the component being initialized.
+     * @param initializer   The initialization logic as a Runnable.
+     * @return true if the initialization succeeds, false otherwise.
+     */
+    private boolean initializeComponent(String componentName, Runnable initializer) {
+        try {
+            initializer.run();
+            LOGGER.info("{} initialized successfully.", componentName);
+            return true;
+        } catch (Exception e) {
+            LOGGER.error("Failed to initialize {}.", componentName, e);
+            return false;
+        }
     }
 }

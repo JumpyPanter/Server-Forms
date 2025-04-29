@@ -15,7 +15,7 @@ import java.io.IOException;
 public class ConfigLoader {
     public static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final File CONFIG_DIR = new File("config");
-    private static final File CONFIG_FILE = new File(CONFIG_DIR, "ServerForms.json");
+    public static final File CONFIG_FILE = new File(CONFIG_DIR, "ServerForms.json");
     private static JsonObject config;
 
     /**
@@ -60,6 +60,7 @@ public class ConfigLoader {
         JsonObject singleResponseForm = new JsonObject();
         singleResponseForm.addProperty("name", "single_response_form");
         singleResponseForm.addProperty("allowMultipleResponses", false);
+        singleResponseForm.addProperty("returnAnswers", true);
         singleResponseForm.addProperty("command", "single_response");
 
         JsonArray singleResponseQuestions = new JsonArray();
@@ -80,6 +81,7 @@ public class ConfigLoader {
         JsonObject multipleResponsesForm = new JsonObject();
         multipleResponsesForm.addProperty("name", "multiple_responses_form");
         multipleResponsesForm.addProperty("allowMultipleResponses", true);
+        multipleResponsesForm.addProperty("returnAnswers", true);
         multipleResponsesForm.addProperty("command", "multiple_responses");
 
         JsonArray multipleResponseQuestions = new JsonArray();
@@ -106,6 +108,29 @@ public class ConfigLoader {
 
         defaultConfig.add("forms", forms);
 
+<<<<<<< Updated upstream
+=======
+        // Add default messages
+        JsonObject messages = new JsonObject();
+        messages.addProperty("formSuccess", "Thank you for completing the form!");
+        messages.addProperty("formError", "An error occurred. Please try again.");
+        messages.addProperty("playerNotFound", "&cPlayer '{player}' does not exist or has never joined the server.");
+        messages.addProperty("formNotFound", "&cForm '{form}' not found for player: {player}.");
+        messages.addProperty("viewingForm", "&aViewing form: {form} for player: {player}.");
+        messages.addProperty("answerRecorded", "&aYour answer has been recorded.");
+        messages.addProperty("noFormsFound", "&cNo forms found for player: {player}.");
+        messages.addProperty("readError", "&cAn error occurred while reading the form file.");
+        messages.addProperty("formExists", "&cA form with this name already exists.");
+        messages.addProperty("formCreated", "&aForm '{form}' created successfully!");
+        messages.addProperty("questionAdded", "&aQuestion added successfully to form '{form}'.");
+        messages.addProperty("questionRemoved", "&aQuestion removed successfully from form '{form}'.");
+        messages.addProperty("questionExists", "&cA question with ID '{id}' already exists.");
+        messages.addProperty("questionNotFound", "&cNo question with ID '{id}' found in form '{form}'.");
+        messages.addProperty("saveError", "&cAn error occurred while saving the configuration.");
+
+        defaultConfig.add("messages", messages);
+
+>>>>>>> Stashed changes
         try (FileWriter writer = new FileWriter(CONFIG_FILE)) {
             GSON.toJson(defaultConfig, writer);
             ServerForms.LOGGER.info("Default forms configuration generated at: " + CONFIG_FILE.getAbsolutePath());

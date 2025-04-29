@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import net.minecraft.server.command.ServerCommandSource;
 import nl.jumpypanter.ServerForms;
 import nl.jumpypanter.commands.PlayerFormSession;
+import nl.jumpypanter.config.ConfigLoader;
 import nl.jumpypanter.utils.TextFormatter;
 
 import java.io.File;
@@ -135,11 +136,22 @@ public class FormHandler {
         // Save the answers to a file
         saveAnswersToFile(source, playerUUID, formName, session.getAnswers());
 
-        // Display the answers to the player
-        source.sendFeedback(() -> TextFormatter.formatColor("&aForm completed! Here are your answers:"), false);
-        session.getAnswers().forEach((questionId, answer) -> {
-            source.sendFeedback(() -> TextFormatter.formatColor("&b" + questionId + ": &f" + answer), false);
-        });
+        // Retrieve the formSuccess message from the config
+        String formSuccessMessage = ConfigLoader.getMessage("formSuccess", "&aForm completed!");
+
+        // Send the formSuccess message
+        source.sendFeedback(() -> TextFormatter.formatColor(formSuccessMessage), false);
+
+        // Check if returning answers is enabled for this form
+        JsonObject formConfig = ConfigLoader.getForms().getAsJsonObject(formName);
+        boolean returnAnswers = formConfig.has("returnAnswers") && formConfig.get("returnAnswers").getAsBoolean();
+
+        if (returnAnswers) {
+            // Display the answers to the player
+            session.getAnswers().forEach((questionId, answer) -> {
+                source.sendFeedback(() -> TextFormatter.formatColor("&b" + questionId + ": &f" + answer), false);
+            });
+        }
     }
 
     /**

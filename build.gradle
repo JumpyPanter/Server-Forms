@@ -43,6 +43,7 @@ dependencies {
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
     implementation 'net.luckperms:api:5.4'
+    implementation 'com.mojang:brigadier:1.0.18'
 }
 
 processResources {

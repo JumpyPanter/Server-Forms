@@ -2,6 +2,14 @@ package nl.jumpypanter.commands;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+<<<<<<< Updated upstream
+=======
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.minecraft.server.command.ServerCommandSource;
+import nl.jumpypanter.ServerForms;
+>>>>>>> Stashed changes
 import nl.jumpypanter.config.ConfigLoader;
 import nl.jumpypanter.events.FormHandler;
 import nl.jumpypanter.ServerForms;
@@ -13,6 +21,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.*;
 import static net.minecraft.server.command.CommandManager.argument;
@@ -177,5 +186,17 @@ public class CommandRegistry {
             source.sendError(TextFormatter.formatColor("&cAn error occurred while reading the form file."));
             return 0;
         }
+    }
+    /**
+     * Registers a command with the given name and handler.
+     *
+     * @param commandName The name of the command.
+     * @param command     The command handler.
+     */
+    public static void registerCommand(String commandName, Consumer<CommandDispatcher<ServerCommandSource>> command) {
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+            command.accept(dispatcher);
+            ServerForms.LOGGER.info("Registered command: /" + commandName);
+        });
     }
 }

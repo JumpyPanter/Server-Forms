@@ -1,6 +1,7 @@
 package nl.jumpypanter;
 
 import nl.jumpypanter.commands.CommandRegistry;
+import nl.jumpypanter.commands.FormCommandHandler;
 import nl.jumpypanter.config.ConfigLoader;
 import nl.jumpypanter.events.FormValidator;
 import nl.jumpypanter.events.ShutdownListener;
@@ -43,6 +44,7 @@ public class ServerForms implements net.fabricmc.api.ModInitializer {
         // Register commands
         try {
             CommandRegistry.register();
+            FormCommandHandler.registerCommands();
             LOGGER.info("Commands registered successfully.");
         } catch (Exception e) {
             LOGGER.error("Failed to register commands.", e);
@@ -58,6 +60,6 @@ public class ServerForms implements net.fabricmc.api.ModInitializer {
             return; // Stop initialization if event listener registration fails
         }
 
-        LOGGER.info("FormMod has initialized successfully.");
+        LOGGER.info("Server Forms has initialized successfully.");
     }
 }

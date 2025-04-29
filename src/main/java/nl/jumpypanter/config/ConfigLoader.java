@@ -108,8 +108,6 @@ public class ConfigLoader {
 
         defaultConfig.add("forms", forms);
 
-<<<<<<< Updated upstream
-=======
         // Add default messages
         JsonObject messages = new JsonObject();
         messages.addProperty("formSuccess", "Thank you for completing the form!");
@@ -130,7 +128,6 @@ public class ConfigLoader {
 
         defaultConfig.add("messages", messages);
 
->>>>>>> Stashed changes
         try (FileWriter writer = new FileWriter(CONFIG_FILE)) {
             GSON.toJson(defaultConfig, writer);
             ServerForms.LOGGER.info("Default forms configuration generated at: " + CONFIG_FILE.getAbsolutePath());
@@ -174,5 +171,10 @@ public class ConfigLoader {
             return new JsonObject();
         }
         return config.getAsJsonObject("settings");
+    }
+
+    public static String getMessage(String key, String defaultMessage) {
+        JsonObject messages = config.getAsJsonObject("messages");
+        return messages.has(key) ? messages.get(key).getAsString() : defaultMessage;
     }
 }
